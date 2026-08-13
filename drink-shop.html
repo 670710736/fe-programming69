@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>การบ้านครั้งที่ 3 · เว็บสั่งเครื่องดื่มหน้าร้าน (Starter)</title>
+<style>
+  /* ==========================================================
+     ส่วน CSS นี้เตรียมไว้ให้แล้ว ไม่ต้องแก้ก็ได้ (จะปรับแต่งเพิ่มก็ได้)
+     โฟกัสที่การเขียน JavaScript ในส่วน <script> ด้านล่างสุด
+     ========================================================== */
+  :root{
+    --bg:#f4f1ea; --card:#ffffff; --ink:#2b2b2b; --muted:#7a7a7a;
+    --brand:#7b4b27; --brand-soft:#efe4d8; --accent:#2f7359; --danger:#c0392b;
+    --line:#e6ded3;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;font-family:'Segoe UI','Sarabun',sans-serif;background:var(--bg);
+    color:var(--ink);line-height:1.7;transition:background .3s,color .3s;
+  }
+  /* คลาสสำหรับโบนัส dark mode (JS จะ toggle คลาสนี้ที่ body) */
+  body.dark{--bg:#1e1b18;--card:#2a2622;--ink:#efe9e2;--muted:#a99f92;--brand-soft:#3a332c;--line:#3d3730}
+  header{
+    background:var(--brand);color:#fff;padding:18px 22px;display:flex;
+    align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;
+  }
+  header h1{margin:0;font-size:22px}
+  .wrap{max-width:880px;margin:0 auto;padding:22px 16px 60px;
+    display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  @media(max-width:720px){.wrap{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;
+    padding:18px 20px;box-shadow:0 2px 8px rgba(0,0,0,.05)}
+  .card h2{margin:0 0 12px;font-size:18px;color:var(--brand);border-bottom:2px solid var(--brand-soft);padding-bottom:6px}
+  body.dark .card h2{color:#e0b088}
+
+  /* เมนู: JS จะ createElement ปุ่มมาต่อท้าย #menu (ปุ่มควรมี class="menu-item") */
+  #menu{display:flex;flex-direction:column;gap:10px}
+  .menu-item{
+    display:flex;justify-content:space-between;align-items:center;
+    background:var(--brand-soft);border:1px solid var(--line);color:var(--ink);
+    border-radius:10px;padding:12px 16px;font-size:16px;cursor:pointer;
+    font-family:inherit;transition:transform .1s,background .15s;text-align:left;
+  }
+  .menu-item:hover{transform:translateY(-2px)}
+  .menu-item .price{font-weight:700;color:var(--accent)}
+
+  /* รายการออเดอร์: JS จะสร้าง <li> ใส่ใน #order-list (แต่ละตัวควรมีปุ่ม class="del") */
+  #order-list{list-style:none;margin:0;padding:0}
+  #order-list li{display:flex;justify-content:space-between;align-items:center;
+    padding:8px 4px;border-bottom:1px dashed var(--line)}
+  #order-list li .del{background:none;border:none;color:var(--danger);
+    font-size:18px;cursor:pointer;line-height:1}
+  .empty{color:var(--muted);font-style:italic}
+
+  .summary{margin-top:14px;padding-top:12px;border-top:2px solid var(--brand-soft);
+    display:flex;justify-content:space-between;font-size:17px;font-weight:700}
+  .summary .total{color:var(--accent)}
+
+  form{margin-top:14px;display:flex;gap:8px;flex-wrap:wrap}
+  input[type="text"]{flex:1;min-width:140px;padding:10px 12px;border:1px solid var(--line);
+    border-radius:10px;font-size:15px;font-family:inherit;background:var(--card);color:var(--ink)}
+  button.action{background:var(--accent);color:#fff;border:none;border-radius:10px;
+    padding:10px 18px;font-size:15px;font-family:inherit;cursor:pointer}
+  #message{margin-top:12px;min-height:24px;font-weight:600}
+  .ok{color:var(--accent)} .err{color:var(--danger)}
+
+  /* ปุ่มเล็กบน header (โบนัส) */
+  .ghost{background:rgba(255,255,255,.18);color:#fff;border:1px solid rgba(255,255,255,.4);
+    border-radius:999px;padding:5px 14px;font-size:13px;cursor:pointer;font-family:inherit}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>☕ ร้านเครื่องดื่ม (สั่งออนไลน์)</h1>
+  <!-- โบนัส: ปุ่มสลับโหมดมืด (ลบเครื่องหมายคอมเมนต์รอบปุ่มนี้เมื่อทำโบนัส) -->
+  <button id="dark-toggle" class="ghost">🌙 โหมดมืด</button> 
+</header>
+
+<div class="wrap">
+
+  <!-- ================= ฝั่งซ้าย: เมนู ================= -->
+  <section class="card">
+    <h2>เมนูเครื่องดื่ม</h2>
+
+    <!-- โบนัส: ช่องค้นหาเมนู (ลบคอมเมนต์รอบ input นี้เมื่อทำโบนัส) -->
+     <input type="text" id="search" placeholder="🔍 ค้นหาเมนู..." style="width:100%;margin-bottom:12px"> 
+
+    <!-- JavaScript จะสร้างปุ่มเมนูมาใส่ในกล่องนี้ (อย่าพิมพ์เมนูตายตัวเอง) -->
+    <div id="menu"></div>
+  </section>
+
+  <!-- ================= ฝั่งขวา: ออเดอร์ + ยืนยัน ================= -->
+  <section class="card">
+    <h2>รายการที่สั่ง</h2>
+
+    <!-- JavaScript จะสร้าง <li> รายการที่สั่งมาใส่ใน <ul> นี้ -->
+    <ul id="order-list">
+      <li class="empty" id="empty-hint">ยังไม่ได้สั่งเครื่องดื่ม</li>
+    </ul>
+
+    <div class="summary">
+      <span>จำนวน: <span id="count">0</span> แก้ว</span>
+      <span class="total">รวม <span id="total">0</span> บาท</span>
+    </div>
+
+    <!-- โบนัส: ปุ่มล้างออเดอร์ (ลบคอมเมนต์เมื่อทำโบนัส) -->
+     <button id="clear" class="ghost" style="margin-top:12px;color:var(--danger);border-color:var(--danger)">🗑 ล้างออเดอร์</button> 
+
+    <form id="order-form">
+      <input type="text" id="customer" placeholder="ชื่อลูกค้า">
+      <button type="submit" class="action">ยืนยันออเดอร์</button>
+    </form>
+    <div id="message"></div>
+  </section>
+
+</div>
+
+<script>
+/* ============================================================
+   การบ้านครั้งที่ 3 · เว็บสั่งเครื่องดื่ม
+   เขียน JavaScript เฉพาะในไฟล์นี้ (HTML/CSS เตรียมให้แล้ว)
+
+   กติกา: ผูก event ด้วย addEventListener เท่านั้น (ห้าม onclick ใน HTML)
+          ข้อความจากผู้ใช้ต้องแสดงด้วย textContent (กัน XSS)
+          ใช้ const / let เท่านั้น + คอมเมนต์กำกับว่าโค้ดตอบข้อไหน
+   ============================================================ */
+
+// ---- ข้อมูลตั้งต้น (ห้ามแก้ array นี้) ----
+const drinks = [
+  { name: "อเมริกาโน่เย็น", price: 45 },
+  { name: "ลาเต้ร้อน",     price: 50 },
+  { name: "ชาไทย",        price: 40 },
+  { name: "โกโก้ปั่น",     price: 55 },
+  { name: "น้ำผึ้งมะนาว",  price: 35 }
+];
+
+// เก็บรายการที่ลูกค้าสั่งไว้ที่นี่ (state) แล้วให้ render() วาดตาม array นี้
+let order = [];   // ตัวอย่างสมาชิก: { name: "ชาไทย", price: 40 }
+
+
+/* ============================================================
+   ✅ CHECKLIST ทำทีละสเต็ป — ทำข้อบนให้ผ่านก่อนค่อยไปข้อถัดไป
+   เปิด Console (F12) ไว้ตลอด และ Save เพื่อดูผลทันทีด้วย Live Server
+   ============================================================ */
+
+
+/* ---- STEP 0 : อ้างอิง element ที่ต้องใช้ -------------------
+   [ ] ใช้ document.getElementById(...) เก็บ element เหล่านี้ไว้ในตัวแปร:
+       menu ("menu"), orderList ("order-list"), countEl ("count"),
+       totalEl ("total"), form ("order-form"), customer ("customer"),
+       message ("message")
+   ทดสอบ: console.log(menu) แล้วไม่ได้ค่า null
+   
+------------------------------------------------------------ */
+// TODO STEP 0
+const menu = document.getElementById("menu");
+const orderList = document.getElementById("order-list");
+const countEl = document.getElementById("count");
+const totalEl = document.getElementById("total");
+const form = document.getElementById("order-form");
+const customer = document.getElementById("customer");
+const message = document.getElementById("message");
+const search = document.getElementById("search");
+const darkToggle = document.getElementById("dark-toggle");
+const clearBtn = document.getElementById("clear");
+console.log(menu)
+
+
+
+
+/* ---- STEP 1 : สร้างเมนูจากข้อมูล (ตอบโจทย์ข้อ 1) ----------
+   [ ] วนลูป drinks ด้วย forEach
+   [ ] แต่ละตัวสร้างปุ่มด้วย document.createElement("button")
+   [ ] ใส่ class "menu-item" และเนื้อหา (ชื่อ + ราคา)
+       แนะนำ: button.innerHTML = `<span>${d.name}</span><span class="price">${d.price} ฿</span>`
+   [ ] เก็บราคา/ชื่อไว้กับปุ่มด้วย dataset เช่น button.dataset.name, button.dataset.price
+   [ ] appendChild ปุ่มเข้าไปใน menu
+   ทดสอบ: เปิดหน้าเว็บต้องเห็นปุ่มเมนูครบ 5 อัน (ลองเพิ่มเครื่องดื่มใน array
+          แล้วเมนูต้องเพิ่มเองโดยไม่แก้โค้ดส่วนอื่น)
+------------------------------------------------------------ */ 
+// TODO STEP 1
+drinks.forEach((d) => {
+  const button = document.createElement("button");
+  button.className = "menu-item";
+  button.innerHTML = `<span>${d.name}</span><span class="price">${d.price} ฿</span>`;
+  button.dataset.name = d.name;
+  button.dataset.price = d.price;
+  menu.appendChild(button);
+});
+
+
+/* ---- STEP 2 : ฟังก์ชัน render() วาดหน้าจอจาก state (ข้อ 3) -
+   [ ] ล้าง orderList ให้ว่างก่อน (orderList.innerHTML = "")
+   [ ] ถ้า order ว่าง แสดงข้อความ "ยังไม่ได้สั่งเครื่องดื่ม" (class="empty")
+   [ ] ถ้ามีของ วน order สร้าง <li> แต่ละแก้ว: ชื่อ+ราคา และปุ่มลบ ✕ (class="del")
+       เก็บตำแหน่งไว้ด้วย เช่น delButton.dataset.index = i
+   [ ] คำนวณจำนวนแก้ว → countEl, ยอดรวม → totalEl
+   หมายเหตุ: เรียก render() ทุกครั้งที่ order เปลี่ยน (เพิ่ม/ลบ)
+------------------------------------------------------------ */
+function render() {
+  orderList.innerHTML = ""; // ล้างของเก่าออกก่อนทุกครั้ง
+
+  if (order.length === 0) {
+    const li = document.createElement("li");
+    li.className = "empty";
+    li.textContent = "ยังไม่ได้สั่งเครื่องดื่ม";
+    orderList.appendChild(li);
+  } else {
+    order.forEach((item, i) => {
+      const li = document.createElement("li");
+
+      const label = document.createElement("span");
+      label.textContent = `${item.name} — ${item.price} ฿`;
+
+      const delBtn = document.createElement("button");
+      delBtn.className = "del";
+      delBtn.textContent = "✕";
+      delBtn.dataset.index = i;
+
+      li.appendChild(label);
+      li.appendChild(delBtn);
+      orderList.appendChild(li);
+    });
+  }
+
+  // อัปเดตจำนวนแก้วและยอดรวม
+  countEl.textContent = order.length;
+  totalEl.textContent = order.reduce((sum, item) => sum + item.price, 0);
+}
+
+
+/* ---- STEP 3 : คลิกเมนูเพื่อสั่ง — ใช้ delegation (ข้อ 2) ---
+   [ ] addEventListener("click", ...) ที่ "menu" ตัวเดียว (ไม่ผูกทีละปุ่ม)
+   [ ] เช็คว่าคลิกโดนปุ่มเมนูจริง (event.target.closest(".menu-item"))
+   [ ] อ่านชื่อ/ราคาจาก dataset แล้ว push เข้า order
+   [ ] เรียก render()
+   ทดสอบ: คลิกเมนู → รายการทางขวาเพิ่มขึ้น ยอดรวมเปลี่ยน
+------------------------------------------------------------ */
+// TODO STEP 3
+menu.addEventListener("click", (event) => {
+  const btn = event.target.closest(".menu-item");
+  if (!btn) return; // คลิกโดนที่อื่นในกล่อง menu ที่ไม่ใช่ปุ่ม ให้ไม่ทำอะไร
+
+  const name = btn.dataset.name;
+  const price = Number(btn.dataset.price);
+  order.push({ name, price });
+  render();
+});
+
+
+/* ---- STEP 4 : ลบทีละแก้ว — ใช้ delegation (ข้อ 2) ---------
+   [ ] addEventListener("click", ...) ที่ "order-list" ตัวเดียว
+   [ ] ถ้าคลิกโดนปุ่ม .del → อ่าน index จาก dataset → order.splice(index, 1)
+   [ ] เรียก render()
+   ทดสอบ: กด ✕ แล้วรายการนั้นหาย ยอดรวมลดลง
+------------------------------------------------------------ */
+// TODO STEP 4
+orderList.addEventListener("click", (event) => {
+  const btn = event.target.closest(".del");
+  if (!btn) return; // ไม่ได้คลิกปุ่ม ✕
+
+  const index = Number(btn.dataset.index);
+  order.splice(index, 1);
+  render();
+});
+
+
+/* ---- STEP 5 : ยืนยันออเดอร์ — ฟอร์ม + preventDefault (ข้อ 4)
+   [ ] addEventListener("submit", ...) ที่ form แล้ว event.preventDefault()
+   [ ] อ่านชื่อลูกค้า customer.value.trim()
+   [ ] ถ้าชื่อว่าง หรือ order.length === 0 → แสดงข้อความเตือนสีแดง (class "err")
+   [ ] ถ้าครบ → แสดงสรุป "ออเดอร์ของคุณ <ชื่อ> ทั้งหมด <n> แก้ว รวม <บาท>" (class "ok")
+       ⚠ ชื่อลูกค้าต้องแสดงแบบกัน XSS → ใช้ textContent (อย่าใช้ innerHTML)
+   ทดสอบ: เว้นชื่อว่าง/ไม่สั่งอะไร → เตือน ; กรอกครบ → ขึ้นสรุปสีเขียว หน้าไม่รีเฟรช
+------------------------------------------------------------ */
+// TODO STEP 5
+form.addEventListener("submit", (event) => {
+  event.preventDefault(); // กันไม่ให้หน้ารีเฟรช (ฟอร์มปกติจะ reload หน้า)
+
+  const name = customer.value.trim();
+
+  if (name === "" || order.length === 0) {
+    message.textContent = "กรุณากรอกชื่อและเลือกเครื่องดื่มอย่างน้อย 1 แก้ว";
+    message.className = "err";
+    return; // ออกจากฟังก์ชันเลย ไม่ต้องทำต่อ
+  }
+
+  const total = order.reduce((sum, item) => sum + item.price, 0);
+
+  message.textContent = ""; // ล้างของเก่าก่อน (เผื่อเคยมี error message ค้างอยู่)
+  message.className = "ok";
+  message.textContent = `ออเดอร์ของคุณ ${name} ทั้งหมด ${order.length} แก้ว รวม ${total} บาท`;
+});
+
+
+// เรียกครั้งแรกให้หน้าจอตรงกับ state เริ่มต้น
+render();
+
+
+/* ============================================================
+   🎁 โบนัส (ไม่บังคับ) — ทำเมื่อข้อ 1–5 เสร็จแล้ว
+   ก่อนทำ ให้ไปลบเครื่องหมายคอมเมนต์ของ element ที่เตรียมไว้ใน HTML
+   (ปุ่มโหมดมืด #dark-toggle, ช่องค้นหา #search, ปุ่มล้าง #clear)
+   ------------------------------------------------------------
+   [ ] B1 ค้นหาเมนูแบบพิมพ์สด: event "input" ที่ #search →
+          ซ่อน/แสดงปุ่มเมนูที่ชื่อไม่ตรง (element.style.display)
+   [ ] B2 โหมดมืด: event "click" ที่ #dark-toggle →
+          document.body.classList.toggle("dark")
+   [ ] B3 ล้างออเดอร์: event "click" ที่ #clear → order = []; render()
+   [ ] B4 กด Enter ในช่องชื่อแล้วต้องไม่รีเฟรชหน้า (จัดการที่ event submit ก็ครอบคลุมแล้ว)
+   [ ] B5 hover เมนูเปลี่ยนสีด้วย event "mouseover" / "mouseout"
+============================================================ */
+// TODO BONUS
+// B1 : ค้นหาเมนูแบบพิมพ์สด
+search.addEventListener("input", () => {
+  const keyword = search.value.trim().toLowerCase();
+  const items = menu.querySelectorAll(".menu-item");
+
+  items.forEach((item) => {
+    const name = item.dataset.name.toLowerCase();
+    item.style.display = name.includes(keyword) ? "flex" : "none";
+  });
+});
+
+// B2 : โหมดมืด
+darkToggle.addEventListener("click", () => {
+  document.body.classList.toggle("dark");
+});
+
+// B3 : ล้างออเดอร์
+clearBtn.addEventListener("click", () => {
+  order = [];
+  render();
+});
+
+// B5 : hover เมนูเปลี่ยนสี (delegation ที่ #menu)
+menu.addEventListener("mouseover", (event) => {
+  const btn = event.target.closest(".menu-item");
+  if (!btn) return;
+  btn.style.background = "var(--accent)";
+  btn.style.color = "#fff";
+});
+
+menu.addEventListener("mouseout", (event) => {
+  const btn = event.target.closest(".menu-item");
+  if (!btn) return;
+  btn.style.background = "";
+  btn.style.color = "";
+});
+</script>
+</body>
+</html>
